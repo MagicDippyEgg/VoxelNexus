@@ -81,12 +81,12 @@ jobs:
 
   # iOS export requires an Apple Developer code-signing identity and a
   # provisioning profile, which live in repo secrets. It is skipped until you:
-  #   1. Set the IOS_EXPORT_ENABLED secret to "true"
+  #   1. Add a repository variable ENABLE_IOS_BUILD = "true"
   #   2. Add the signing certificate + provisioning profile secrets
   #   3. Set application/code_sign_identity in export_presets.cfg
   build-ios:
     name: Build iOS
-    if: ${{ secrets.IOS_EXPORT_ENABLED == 'true' }}
+    if: vars.ENABLE_IOS_BUILD == 'true'
     runs-on: macos-14
     steps:
       - uses: actions/checkout@v4
