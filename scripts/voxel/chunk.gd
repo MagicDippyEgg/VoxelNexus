@@ -17,11 +17,23 @@ var collision_body: StaticBody3D
 var generator: WorldGenerator
 var world_ref: Node = null
 
+static var _block_mat: StandardMaterial3D = null
+
+static func get_block_material() -> StandardMaterial3D:
+	if _block_mat == null:
+		_block_mat = StandardMaterial3D.new()
+		_block_mat.vertex_color_use_as_albedo = true
+		_block_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		_block_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+		_block_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	return _block_mat
+
 func _init() -> void:
 	mesh_instance = MeshInstance3D.new()
 	collision_body = StaticBody3D.new()
 	mesh_instance.name = "MeshInstance3D"
 	collision_body.name = "Collision"
+	mesh_instance.material_override = get_block_material()
 	add_child(mesh_instance)
 	add_child(collision_body)
 
