@@ -145,6 +145,8 @@ func _spawn_player(peer_id: int, name: String, color: Color) -> Player:
 	player.global_position = WorldManager.get_spawn_point()
 	if peer_id == multiplayer.get_unique_id():
 		player.camera.current = true
+		Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+		player.mouse_captured = true
 
 	player.set_name_label(name)
 	player.set_is_local_player(peer_id == multiplayer.get_unique_id())
@@ -411,6 +413,9 @@ var _last_pos := Vector3.ZERO
 func _toggle_chat() -> void:
 	_chat_open = not _chat_open
 	if _chat_open:
+		Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+		if local_player:
+			local_player.mouse_captured = false
 		chat_input = LineEdit.new()
 		chat_input.placeholder_text = "Chat (Enter to send)"
 		chat_input.custom_minimum_size = Vector2(420, 36)
@@ -420,11 +425,13 @@ func _toggle_chat() -> void:
 		hud.get_node("Root").add_child(chat_input)
 		chat_input.text_submitted.connect(_send_chat)
 		chat_input.grab_focus()
-		Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
 	else:
 		if chat_input:
 			chat_input.queue_free()
 		chat_input = null
+		Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+		if local_player:
+			local_player.mouse_captured = true
 
 var chat_input: LineEdit
 

@@ -127,7 +127,7 @@ func _update_movement(delta: float) -> void:
 		var basis := global_transform.basis
 
 		var move_dir := Vector3.ZERO
-		move_dir += -basis.z * input_dir.y
+		move_dir += basis.z * input_dir.y
 		move_dir += basis.x * input_dir.x
 
 		if is_multiplayer_authority():
@@ -158,7 +158,7 @@ func _update_movement(delta: float) -> void:
 
 		var basis := global_transform.basis
 		var move_dir := Vector3.ZERO
-		move_dir -= basis.z * input_dir.y
+		move_dir += basis.z * input_dir.y
 		move_dir += basis.x * input_dir.x
 		if move_dir.length() > 0:
 			move_dir = move_dir.normalized()
@@ -269,9 +269,9 @@ func _mine_block() -> void:
 	var position_hit: Vector3 = hit["position"]
 	var normal: Vector3 = hit["normal"]
 	var target := Vector3i(
-		floori(position_hit.x - normal.x * 0.5 + 0.5),
-		floori(position_hit.y - normal.y * 0.5 + 0.5),
-		floori(position_hit.z - normal.z * 0.5 + 0.5)
+		floori(position_hit.x - normal.x * 0.5),
+		floori(position_hit.y - normal.y * 0.5),
+		floori(position_hit.z - normal.z * 0.5)
 	)
 	_request_block_edit(target, BlockTypes.Block.AIR)
 
@@ -284,9 +284,9 @@ func _place_block() -> void:
 	var position_hit: Vector3 = hit["position"]
 	var normal: Vector3 = hit["normal"]
 	var target := Vector3i(
-		floori(position_hit.x + normal.x * 0.5 + 0.5),
-		floori(position_hit.y + normal.y * 0.5 + 0.5),
-		floori(position_hit.z + normal.z * 0.5 + 0.5)
+		floori(position_hit.x + normal.x * 0.5),
+		floori(position_hit.y + normal.y * 0.5),
+		floori(position_hit.z + normal.z * 0.5)
 	)
 	# Don't place into player capsule
 	if _player_overlaps(target):
