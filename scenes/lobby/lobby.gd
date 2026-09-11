@@ -138,7 +138,8 @@ func _get_lan_ip() -> String:
 
 func _host_game() -> void:
 	var mode_index := _host_mode_option.get_selected()
-	var mode_key := GAME_MODES[mode_index]["name"].to_snake_case()
+	var mode_name: String = GAME_MODES[mode_index]["name"]
+	var mode_key := mode_name.to_snake_case()
 	var ok := NetworkManager.host_game(NetworkManager.player_name, mode_key)
 	if ok:
 		_status_label.text = "Hosting on port %d..." % NetworkManager.DEFAULT_PORT

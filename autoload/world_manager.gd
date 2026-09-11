@@ -171,7 +171,7 @@ func update_player_chunks(player_pos: Vector3i) -> void:
 
 	# Unload far chunks (Chebyshev distance to avoid load/unload churn)
 	for chunk_pos in chunks.keys():
-		var d := chunk_pos - center_chunk
+		var d: Vector3i = chunk_pos - center_chunk
 		var max_axis := maxi(abs(d.x), maxi(abs(d.y), abs(d.z)))
 		if max_axis > RENDER_DISTANCE + 1:
 			unload_chunk(chunk_pos)
