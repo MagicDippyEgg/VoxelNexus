@@ -1,4 +1,4 @@
-name: 📱 Build Mobile
+name: Build Mobile
 
 on:
   push:
@@ -10,59 +10,106 @@ concurrency:
   group: mobile-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  GODOT_VERSION: "4.4.1"
+
 jobs:
   build-android:
-    name: Build Android
+    name: Build Android APK
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
 
-      - name: Import project cache
-        run: |
-          echo "::group::godot"
-          echo "::endgroup::"
-
-      - name: Build Android APK
-        id: build
-        uses: mlm-games/godot-build-action@v1
+      - name: Set up JDK
+        uses: actions/setup-java@v4
         with:
-          GODOT_VER: "4.4"
-          EXPORT_PRESET_NAME: "Android"
-          CREATE_PRESET_LINUX: true
-          EXPORT_DIR: builds
-          ANDROID_ABIS: "arm64-v8a;armeabi-v7a"
-          ANDROID_BUILD_TEMPLATE: true
+          distribution: temurin
+          java-version: 17
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v4
+
+      - name: Setup Godot
+        uses: chickensoft-games/setup-godot@v2
+        with:
+          version: ${{ env.GODOT_VERSION }}
+          use-dotnet: false
+          include-templates: true
+
+      - name: Create debug keystore
+        run: |
+          mkdir -p "$HOME/.android"
+          if [ ! -f "$HOME/.android/debug.keystore" ]; then
+            keytool -genkeypair -v -keystore "$HOME/.android/debug.keystore" \
+              -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 \
+              -storepass android -keypass android \
+              -dname "CN=Android Debug,O=Android,C=US"
+          fi
+
+      - name: Point Godot at the Android SDK
+        shell: bash
+        env:
+          ANDROID_SDK: ${{ env.ANDROID_SDK_ROOT }}
+        run: |
+          cat > "$HOME/.config/godot/editor_settings-4.tres" <<EOF
+          [gd_resource type="EditorSettings" format=3]
+
+          [resource]
+
+          export/android/android_sdk_path = "$ANDROID_SDK"
+          export/android/shutdown_adb_on_exit = true
+          export/android/debug_keystore = "$HOME/.android/debug.keystore"
+          export/android/debug_keystore_user = "androiddebugkey"
+          export/android/debug_keystore_pass = "android"
+          EOF
+
+      - name: Import project
+        run: godot --headless --editor --quit || true
+
+      - name: Export Android APK
+        run: |
+          mkdir -p build
+          godot --headless --export-release "Android" "build/voxelnexus_android.apk"
 
       - name: Upload Android artifact
         uses: actions/upload-artifact@v4
         with:
           name: voxelnexus-android
-          path: |
-            build/**
-            builds/**
-          if-no-files-found: warn
+          path: build/
+          if-no-files-found: error
           retention-days: 30
 
+  # iOS export requires an Apple Developer code-signing identity and a
+  # provisioning profile, which live in repo secrets. It is skipped until you:
+  #   1. Set the IOS_EXPORT_ENABLED secret to "true"
+  #   2. Add the signing certificate + provisioning profile secrets
+  #   3. Set application/code_sign_identity in export_presets.cfg
   build-ios:
     name: Build iOS
+    if: ${{ secrets.IOS_EXPORT_ENABLED == 'true' }}
     runs-on: macos-14
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build iOS
-        id: build
-        uses: mlm-games/godot-build-action@v1
+      - name: Setup Godot
+        uses: chickensoft-games/setup-godot@v2
         with:
-          GODOT_VER: "4.4"
-          EXPORT_PRESET_NAME: "iOS"
-          EXPORT_DIR: builds
+          version: ${{ env.GODOT_VERSION }}
+          use-dotnet: false
+          include-templates: true
+
+      - name: Import project
+        run: godot --headless --editor --quit || true
+
+      - name: Export iOS
+        run: |
+          mkdir -p build
+          godot --headless --export-release "iOS" "build/voxelnexus_ios.tar.gz"
 
       - name: Upload iOS artifact
         uses: actions/upload-artifact@v4
         with:
           name: voxelnexus-ios
-          path: |
-            build/**
-            builds/**
-          if-no-files-found: warn
+          path: build/
+          if-no-files-found: error
           retention-days: 30
