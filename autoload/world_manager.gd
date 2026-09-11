@@ -158,7 +158,7 @@ func update_player_chunks(player_pos: Vector3i) -> void:
 	var center_chunk := world_to_chunk(player_pos)
 	var to_load: Array[Vector3i] = []
 	for x in range(-RENDER_DISTANCE, RENDER_DISTANCE + 1):
-		for y in range(0, 2):
+		for y in range(0, 5):
 			for z in range(-RENDER_DISTANCE, RENDER_DISTANCE + 1):
 				var chunk_pos := center_chunk + Vector3i(x, y, z)
 				if not chunks.has(chunk_pos):

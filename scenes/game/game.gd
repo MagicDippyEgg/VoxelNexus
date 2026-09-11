@@ -65,11 +65,15 @@ func _setup_world() -> void:
 
 	WorldManager.create_world(world, seed_value)
 
-	# Preload a small ring around spawn so the world appears immediately
-	for dx in range(-2, 3):
-		for dz in range(-2, 3):
-			WorldManager.ensure_chunk(Vector3i(dx, 0, dz))
-			WorldManager.ensure_chunk(Vector3i(dx, 1, dz))
+	# Preload chunks around the spawn point (including the surface chunk) so
+	# the player never drops into unresolved terrain before the async loader
+	# has generated the landing zone.
+	var spawn_point := WorldManager.get_spawn_point()
+	var spawn_chunk := WorldManager.world_to_chunk(Vector3i(spawn_point))
+	for dx in range(-1, 2):
+		for dz in range(-1, 2):
+			for dy in range(maxi(0, spawn_chunk.y - 1), spawn_chunk.y + 2):
+				WorldManager.ensure_chunk(spawn_chunk + Vector3i(dx, dy, dz))
 
 func _setup_lights() -> void:
 	_sun = DirectionalLight3D.new()
@@ -197,12 +201,18 @@ func _current_chunk_target() -> Vector3i:
 func _update_chunk_loading() -> void:
 	if not local_player:
 		return
-	# Throttle chunk generation to keep the frame budget stable (max 8/frame)
+	# Throttle chunk generation to keep the frame budget stable (max 8/frame).
+	# Fill columns around the player first (center-out) so nearby surface
+	# appears before distant chunks.
 	var center := WorldManager.world_to_chunk(Vector3i(local_player.global_position))
+	var xz_order: Array = [0]
+	for o in range(1, WorldManager.RENDER_DISTANCE + 1):
+		xz_order.append(o)
+		xz_order.append(-o)
 	var loaded_this_frame := 0
-	for x in range(-WorldManager.RENDER_DISTANCE, WorldManager.RENDER_DISTANCE + 1):
-		for y in range(0, 3):
-			for z in range(-WorldManager.RENDER_DISTANCE, WorldManager.RENDER_DISTANCE + 1):
+	for x in xz_order:
+		for y in range(0, 5):
+			for z in xz_order:
 				if loaded_this_frame >= 8:
 					return
 				var cp := center + Vector3i(x, y, z)
@@ -271,6 +281,7 @@ func _setup_hud() -> void:
 
 	var ui_root := Control.new()
 	ui_root.set_anchors_preset(Control.PRESET_FULL_RECT)
+	ui_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	ui_root.name = "Root"
 	hud.add_child(ui_root)
 

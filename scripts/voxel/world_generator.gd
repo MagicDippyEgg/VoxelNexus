@@ -245,5 +245,15 @@ func get_deep_block(biome: int, world_x: int, world_y: int, world_z: int) -> int
 			return BlockTypes.Block.STONE
 		_:
 			if n > 0.7:
-				return BlockTypes.Block.COUNT - 1 if _rng.randf() > 0.99 else BlockTypes.Block.STONE
+				return BlockTypes.Block.COUNT - 1 if _block_random(world_x, world_y, world_z) < 0.01 else BlockTypes.Block.STONE
 			return BlockTypes.Block.STONE
+
+func _block_random(world_x: int, world_y: int, world_z: int) -> float:
+	# Deterministic per-coordinate hash so worldgen never depends on call order
+	# (a stateful RNG here made get_spawn_point() return different columns
+	# before vs after chunk preloading, so players spawned over un-generated ground).
+	var h: int = world_x * 374761393 + world_y * 668265263 + world_z * 2147480151
+	h += seed_value * 19349669
+	h = (h ^ (h >> 13)) * 1274126177
+	h = h ^ (h >> 16)
+	return float(posmod(h, 1000000)) / 1000000.0
