@@ -42,7 +42,7 @@ jobs:
 
       - if: matrix.android == true
         name: Set up JDK
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: 17
@@ -75,6 +75,7 @@ jobs:
         env:
           ANDROID_SDK: ${{ env.ANDROID_SDK_ROOT }}
         run: |
+          mkdir -p "$HOME/.config/godot"
           cat > "$HOME/.config/godot/editor_settings-4.tres" <<EOF
           [gd_resource type="EditorSettings" format=3]
 
