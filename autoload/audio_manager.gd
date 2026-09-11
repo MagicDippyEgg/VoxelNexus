@@ -50,11 +50,10 @@ func _make_tone(frequency: float, duration: float, volume: float, pan: float = 0
 	wav.data = data
 	return wav
 
-func play_sfx(frequency: float = 440.0, duration: float = 0.1, volume: float = 0.3, pan: float = 0.0) -> void:
+func play_sfx(frequency: float = 440.0, duration: float = 0.1, volume: float = 0.3) -> void:
 	var freq := frequency * (0.9 + _rng.randf() * 0.2)
 	var wav := _make_tone(freq, duration, volume)
 	sfx_player.stream = wav
-	sfx_player.pan_stereo = pan
 	sfx_player.play()
 
 func play_block_break(block_id: int) -> void:

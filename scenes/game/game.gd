@@ -3,6 +3,7 @@ extends Node3D
 const BlockTypes := preload("res://scripts/voxel/block_types.gd")
 const UITheme := preload("res://scenes/ui_theme.gd")
 const PlayerScript := preload("res://scripts/player/player.gd")
+const TouchJoystick := preload("res://scripts/ui/touch_joystick.gd")
 
 var world: Node3D
 var players_node: Node3D
@@ -149,8 +150,9 @@ func _spawn_player(peer_id: int, name: String, color: Color) -> Player:
 	player.global_position = WorldManager.get_spawn_point()
 	if peer_id == multiplayer.get_unique_id():
 		player.camera.current = true
-		Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
-		player.mouse_captured = true
+		if not _is_mobile():
+			Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+			player.mouse_captured = true
 
 	player.set_name_label(name)
 	player.set_is_local_player(peer_id == multiplayer.get_unique_id())
@@ -209,10 +211,26 @@ func _update_chunk_loading() -> void:
 	for o in range(1, WorldManager.RENDER_DISTANCE + 1):
 		xz_order.append(o)
 		xz_order.append(-o)
+
+	# Only generate columns the camera can actually see (skip everything behind
+	# the near/other frustum planes) so we don't mesh invisible geometry.
+	var frustum: Array = []
+	if is_instance_valid(local_player.camera):
+		frustum = local_player.camera.get_frustum()
+
 	var loaded_this_frame := 0
 	for x in xz_order:
-		for y in range(0, 5):
-			for z in xz_order:
+		for z in xz_order:
+			# Never skip the few columns the player is standing in/near, even if
+			# the camera isn't looking at their corners (tall AABBs can bench
+			# every corner outside the view cone). Only frustum-cull far columns.
+			if absi(x) > WorldManager.CORE_RADIUS or absi(z) > WorldManager.CORE_RADIUS:
+				if frustum.size() > 0:
+					var minp := Vector3((center.x + x) * WorldManager.CHUNK_SIZE, 0, (center.z + z) * WorldManager.CHUNK_SIZE)
+					var maxp := Vector3(minp.x + WorldManager.CHUNK_SIZE, 96, minp.z + WorldManager.CHUNK_SIZE)
+					if not _aabb_in_frustum(frustum, minp, maxp):
+						continue
+			for y in range(0, 5):
 				if loaded_this_frame >= 8:
 					return
 				var cp := center + Vector3i(x, y, z)
@@ -226,6 +244,20 @@ func _update_chunk_loading() -> void:
 		var max_axis := maxi(abs(d.x), maxi(abs(d.y), abs(d.z)))
 		if max_axis > WorldManager.RENDER_DISTANCE + 1:
 			WorldManager.unload_chunk(cp)
+
+func _aabb_in_frustum(frustum: Array, minp: Vector3, maxp: Vector3) -> bool:
+	for x in [minp.x, maxp.x]:
+		for y in [minp.y, maxp.y]:
+			for z in [minp.z, maxp.z]:
+				var p := Vector3(x, y, z)
+				var inside := true
+				for pl in frustum:
+					if pl.distance_to(p) < 0.0:
+						inside = false
+						break
+				if inside:
+					return true
+	return false
 
 func _update_hud(delta: float) -> void:
 	if not hud or not local_player:
@@ -303,6 +335,7 @@ func _setup_hud() -> void:
 	top_bar.offset_left = 12
 	top_bar.offset_right = -12
 	top_bar.add_theme_constant_override("separation", 24)
+	top_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	ui_root.add_child(top_bar)
 
 	position_label = Label.new()
@@ -337,6 +370,7 @@ func _setup_hud() -> void:
 	health_panel.offset_top = -100
 	health_panel.offset_left = -60
 	health_panel.offset_right = 60
+	health_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	ui_root.add_child(health_panel)
 	health_label = Label.new()
 	health_label.text = "♥ 100"
@@ -351,6 +385,7 @@ func _setup_hud() -> void:
 	hotbar.offset_top = -50
 	hotbar.alignment = BoxContainer.ALIGNMENT_CENTER
 	hotbar.add_theme_constant_override("separation", 4)
+	hotbar.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	ui_root.add_child(hotbar)
 
 	for i in range(PlayerScript.HOTBAR_BLOCKS.size()):
@@ -374,6 +409,7 @@ func _setup_hud() -> void:
 	chat_margin.offset_left = 12
 	chat_margin.custom_minimum_size = Vector2(420, 140)
 	chat_margin.size_flags_vertical = Control.SIZE_SHRINK_END
+	chat_margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	ui_root.add_child(chat_margin)
 
 	chat_history = Label.new()
@@ -397,6 +433,7 @@ func _setup_hud() -> void:
 	hotbar_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	hotbar_hint.add_theme_font_size_override("font_size", 12)
 	hotbar_hint.add_theme_color_override("font_color", Color(1, 1, 1, 0.6))
+	hotbar_hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	ui_root.add_child(hotbar_hint)
 
 	toast_label = Label.new()
@@ -407,10 +444,111 @@ func _setup_hud() -> void:
 	toast_label.add_theme_color_override("font_color", Color(1.0, 0.9, 0.4))
 	toast_label.add_theme_color_override("font_outline_color", Color.BLACK)
 	toast_label.add_theme_constant_override("outline_size", 6)
+	toast_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	ui_root.add_child(toast_label)
+
+	if _is_mobile():
+		_setup_touch_controls()
 
 	NetworkManager.chat_message_received.connect(on_chat_message)
 	add_message("[SERVER]", "Welcome to VoxelNexus! Seed: " + str(WorldManager.world_seed))
+
+func _is_mobile() -> bool:
+	return OS.has_feature("mobile") or DisplayServer.get_name().to_lower() in ["android", "ios"]
+
+func _setup_touch_controls() -> void:
+	var root: Control = hud.get_node("Root")
+
+	# Virtual movement joystick (bottom-left thumb zone)
+	var joy: Control = TouchJoystick.new()
+	joy.anchor_left = 0.0
+	joy.anchor_top = 1.0
+	joy.anchor_right = 0.0
+	joy.anchor_bottom = 1.0
+	joy.offset_left = 24
+	joy.offset_right = 210
+	joy.offset_top = -206
+	joy.offset_bottom = -24
+	joy.stick_moved.connect(_on_joy_stick)
+	root.add_child(joy)
+
+	# Action buttons (bottom-right thumb zone)
+	var box := VBoxContainer.new()
+	box.anchor_left = 1.0
+	box.anchor_top = 1.0
+	box.anchor_right = 1.0
+	box.anchor_bottom = 1.0
+	box.offset_left = -176
+	box.offset_right = -16
+	box.offset_top = -334
+	box.offset_bottom = -70
+	box.add_theme_constant_override("separation", 10)
+	box.mouse_filter = Control.MOUSE_FILTER_STOP
+	root.add_child(box)
+
+	var next_btn := Button.new()
+	next_btn.text = "NEXT BLOCK"
+	next_btn.custom_minimum_size = Vector2(0, 46)
+	next_btn.button_down.connect(_next_block)
+	box.add_child(next_btn)
+
+	var fly_btn := Button.new()
+	fly_btn.text = "FLY"
+	fly_btn.custom_minimum_size = Vector2(0, 46)
+	fly_btn.button_down.connect(func(): _dispatch_action("toggle_flight", true))
+	box.add_child(fly_btn)
+
+	var place_btn := Button.new()
+	place_btn.text = "PLACE"
+	place_btn.custom_minimum_size = Vector2(0, 46)
+	place_btn.button_down.connect(func():
+		if local_player:
+			local_player.touch_place = true)
+	place_btn.button_up.connect(func():
+		if local_player:
+			local_player.touch_place = false)
+	box.add_child(place_btn)
+
+	var mine_btn := Button.new()
+	mine_btn.text = "MINE"
+	mine_btn.custom_minimum_size = Vector2(0, 46)
+	mine_btn.button_down.connect(func():
+		if local_player:
+			local_player.touch_mine = true)
+	mine_btn.button_up.connect(func():
+		if local_player:
+			local_player.touch_mine = false)
+	box.add_child(mine_btn)
+
+	var jump_btn := Button.new()
+	jump_btn.text = "JUMP"
+	jump_btn.custom_minimum_size = Vector2(0, 46)
+	jump_btn.button_down.connect(func(): _dispatch_action("jump", true))
+	jump_btn.button_up.connect(func(): _dispatch_action("jump", false))
+	box.add_child(jump_btn)
+
+func _on_joy_stick(stick: Vector2) -> void:
+	_input_action("move_left", stick.x < -0.25)
+	_input_action("move_right", stick.x > 0.25)
+	_input_action("move_forward", stick.y < -0.25)
+	_input_action("move_back", stick.y > 0.25)
+
+func _input_action(action_name: String, pressed: bool) -> void:
+	if pressed:
+		Input.action_press(action_name)
+	else:
+		Input.action_release(action_name)
+
+func _dispatch_action(action_name: String, pressed: bool) -> void:
+	var ev := InputEventAction.new()
+	ev.action = action_name
+	ev.pressed = pressed
+	Input.parse_input_event(ev)
+
+func _next_block() -> void:
+	if local_player:
+		local_player.selected_slot = (local_player.selected_slot + 1) % local_player.HOTBAR_BLOCKS.size()
+		local_player.selected_slot_changed.emit(local_player.selected_slot)
 
 var position_label: Label
 var mode_label: Label

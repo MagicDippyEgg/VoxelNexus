@@ -25,7 +25,6 @@ static func get_block_material() -> StandardMaterial3D:
 		_block_mat.vertex_color_use_as_albedo = true
 		_block_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 		_block_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
-		_block_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	return _block_mat
 
 func _init() -> void:

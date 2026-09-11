@@ -25,6 +25,8 @@ var camera_pitch: float = 0.0
 var is_flying := false
 var is_sprinting := false
 var mouse_captured := false
+var touch_mine := false
+var touch_place := false
 var health: float = 100.0
 var max_health := 100.0
 var alive := true
@@ -189,13 +191,18 @@ func _update_survival(delta: float) -> void:
 		health_changed.emit(health)
 
 func is_platform_mobile() -> bool:
-	return DisplayServer.get_name() in ["Android", "iOS"]
+	return OS.has_feature("mobile") or DisplayServer.get_name().to_lower() in ["android", "ios"]
 
 func _unhandled_input(event: InputEvent) -> void:
 	if not _awake or not is_multiplayer_authority():
 		return
 
 	if event is InputEventMouseMotion and mouse_captured:
+		rotate_y(-event.relative.x * MOUSE_SENSITIVITY)
+		camera_pitch = clampf(camera_pitch - event.relative.y * MOUSE_SENSITIVITY, -1.45, 1.45)
+		camera.rotation.x = camera_pitch
+
+	if is_platform_mobile() and event is InputEventScreenDrag:
 		rotate_y(-event.relative.x * MOUSE_SENSITIVITY)
 		camera_pitch = clampf(camera_pitch - event.relative.y * MOUSE_SENSITIVITY, -1.45, 1.45)
 		camera.rotation.x = camera_pitch
@@ -249,6 +256,15 @@ func _update_tools(delta: float) -> void:
 		_mine_cooldown = 0.18
 
 	if Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT) and _build_cooldown <= 0:
+		_place_block()
+		_build_cooldown = 0.18
+
+	# Touch hold-to-use buttons (mobile)
+	if touch_mine and _mine_cooldown <= 0:
+		_mine_block()
+		_mine_cooldown = 0.18
+
+	if touch_place and _build_cooldown <= 0:
 		_place_block()
 		_build_cooldown = 0.18
 

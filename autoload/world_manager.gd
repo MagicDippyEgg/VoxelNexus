@@ -16,6 +16,7 @@ const BIOME_NAMES := ["Plains", "Desert", "Crystal Caves", "Floating Islands", "
 
 const CHUNK_SIZE := 16
 const RENDER_DISTANCE := 6
+const CORE_RADIUS := 1
 const UNLOAD_DISTANCE := 8
 
 var world_seed: int = 1337
