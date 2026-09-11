@@ -1,0 +1,51 @@
+name: 🚀 Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    name: Release ${{ matrix.platform }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: Windows
+            preset: "Windows Desktop"
+            os: ubuntu-22.04
+          - platform: Linux
+            preset: "Linux/X11"
+            os: ubuntu-22.04
+          - platform: MacOS
+            preset: "macOS"
+            os: macos-14
+          - platform: Android
+            preset: "Android"
+            os: ubuntu-22.04
+          - platform: iOS
+            preset: "iOS"
+            os: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build ${{ matrix.platform }}
+        id: build
+        uses: mlm-games/godot-build-action@v1
+        with:
+          GODOT_VER: "4.4"
+          EXPORT_PRESET_NAME: "${{ matrix.preset }}"
+          CREATE_PRESET_LINUX: true
+          EXPORT_DIR: builds
+
+      - name: Upload to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            build/**
+            builds/**
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,0 +1,76 @@
+name: 🖥️ Build Desktop
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: desktop-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate Project
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Godot import + validate
+        uses: mlm-games/godot-build-action@v1
+        with:
+          GODOT_VER: "4.4"
+          EXPORT_PRESET_NAME: "Linux/X11"
+          CREATE_PRESET_LINUX: true
+
+  build:
+    name: Build ${{ matrix.platform }}
+    needs: [validate]
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: Windows
+            preset: "Windows Desktop"
+            file: "build/voxelnexus_windows.exe"
+          - platform: Linux
+            preset: "Linux/X11"
+            file: "build/voxelnexus_linux.x86_64"
+          - platform: MacOS
+            preset: "macOS"
+            file: "build/voxelnexus_macos.zip"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/godot
+            ~/.local/share/godot
+          key: ${{ runner.os }}-godot
+
+      - name: Build ${{ matrix.platform }}
+        id: build
+        uses: mlm-games/godot-build-action@v1
+        with:
+          GODOT_VER: "4.4"
+          EXPORT_PRESET_NAME: "${{ matrix.preset }}"
+          CREATE_PRESET_LINUX: true
+          EXPORT_DIR: builds
+
+      - name: List build outputs
+        run: |
+          ls -la builds/ 2>/dev/null || ls -la build/ 2>/dev/null || echo "checking for outputs"
+          find . -name "*.exe" -o -name "*.x86_64" -o -name "*.zip" 2>/dev/null | head -20
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: voxelnexus-${{ matrix.platform }}
+          path: |
+            build/**
+            builds/**
+          if-no-files-found: warn
+          retention-days: 30

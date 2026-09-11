@@ -1,0 +1,14 @@
+# Godot 4
+.godot/
+*.tmp
+*.import.new
+build/
+export/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+*.tres.bak
+*.tscn.bak

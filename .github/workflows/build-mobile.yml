@@ -1,0 +1,68 @@
+name: 📱 Build Mobile
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: mobile-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-android:
+    name: Build Android
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Import project cache
+        run: |
+          echo "::group::godot"
+          echo "::endgroup::"
+
+      - name: Build Android APK
+        id: build
+        uses: mlm-games/godot-build-action@v1
+        with:
+          GODOT_VER: "4.4"
+          EXPORT_PRESET_NAME: "Android"
+          CREATE_PRESET_LINUX: true
+          EXPORT_DIR: builds
+          ANDROID_ABIS: "arm64-v8a;armeabi-v7a"
+          ANDROID_BUILD_TEMPLATE: true
+
+      - name: Upload Android artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: voxelnexus-android
+          path: |
+            build/**
+            builds/**
+          if-no-files-found: warn
+          retention-days: 30
+
+  build-ios:
+    name: Build iOS
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build iOS
+        id: build
+        uses: mlm-games/godot-build-action@v1
+        with:
+          GODOT_VER: "4.4"
+          EXPORT_PRESET_NAME: "iOS"
+          EXPORT_DIR: builds
+
+      - name: Upload iOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: voxelnexus-ios
+          path: |
+            build/**
+            builds/**
+          if-no-files-found: warn
+          retention-days: 30
